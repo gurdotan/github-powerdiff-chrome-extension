@@ -32,17 +32,24 @@ setTimeout(() => {
   // container.insertBefore(anchor, container.childNodes[0]);
   // ReactDOM.render(<Newtab/>, anchor);
 
-  document.querySelectorAll('.file')
+  [...document.querySelectorAll('.file')]
+    .filter(el => !!el.querySelector('.blob-code.blob-code-addition, .blob-code.blob-code-deletion'))
     .map(findCodeChangeNodes)
     .map(toCodeChangeList)
     .forEach(codeChanges => {
+
+      console.log(codeChanges);
 
       const allImports = codeChanges
         .map(node => node.text)
         .reduce((acc, text) => acc && (text.startsWith('import ') || text === ''), true);
 
       if (allImports) {
-        file.querySelector('.js-reviewed-checkbox').click();
+        let viewedCheckbox = codeChanges[0].el.closest('.file').querySelector('.js-reviewed-checkbox');
+
+        if (!viewedCheckbox.checked) {
+          viewedCheckbox.click();
+        }
       }
 
 

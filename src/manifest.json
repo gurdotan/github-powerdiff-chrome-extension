@@ -1,0 +1,38 @@
+{
+  "name": "Github PowerDiff",
+  "short_name": "Github PowerDiff - Short",
+  "options_page": "options.html",
+  "background": {
+    "page": "background.html",
+    "persistent": false
+  },
+  "browser_action": {
+    "default_popup": "popup.html",
+    "default_icon": "icon-34.png"
+  },
+  "chrome_url_overrides": {
+    "newtab": "newtab.html"
+  },
+  "icons": {
+    "128": "icon-128.png"
+  },
+  "content_scripts": [{
+    "matches": ["http://*/*", "https://*/*", "<all_urls>"],
+    "css": ["content.styles.css"]
+  }],
+  "web_accessible_resources": [
+    "content.styles.css",
+    "icon-128.png",
+    "icon-34.png"
+  ],
+  "permissions": [
+    "storage",
+    "*://*.github.com/*"
+  ],
+  "optional_permissions": [
+    "http://*/*",
+    "https://*/*"
+  ],
+  "manifest_version": 2,
+  "content_security_policy": "script-src 'self' 'unsafe-eval'; object-src 'self'"
+}

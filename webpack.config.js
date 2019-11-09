@@ -5,7 +5,8 @@ var webpack = require('webpack'),
   { CleanWebpackPlugin } = require('clean-webpack-plugin'),
   CopyWebpackPlugin = require('copy-webpack-plugin'),
   HtmlWebpackPlugin = require('html-webpack-plugin'),
-  WriteFilePlugin = require('write-file-webpack-plugin');
+  WriteFilePlugin = require('write-file-webpack-plugin'),
+  WebpackBuildNotifierPlugin = require('webpack-build-notifier');
 
 // load the secrets
 var alias = {
@@ -78,6 +79,12 @@ var options = {
       .concat(['.jsx', '.js', '.css']),
   },
   plugins: [
+    new WebpackBuildNotifierPlugin({
+      successSound: false,
+      notifyOptions: {
+        timeout: 1
+      }
+    }),
     new webpack.ProgressPlugin(),
     // clean the build folder
     new CleanWebpackPlugin({

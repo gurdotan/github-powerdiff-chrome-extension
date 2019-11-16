@@ -5,6 +5,7 @@ import { AppTheme, lightTheme } from '@datorama/app-components';
 import { ThemeProvider } from 'styled-components';
 import StorageSync from '../../common/storage-sync';
 
+const EXTENSION_ROOT = 'github-powerdiff-extension-root';
 const CODE_ADDITION = '.blob-code-addition';
 const CODE_DELETION = '.blob-code-deletion';
 
@@ -45,16 +46,25 @@ const onlyFilesWithChanges = file => file.changes.length;
 let rendered = false;
 
 const powerDiff = () => {
-	if (!rendered) {
+	console.log('--- in powerDiff');
+	observe();
+
+
+	if (!document.querySelector(`#${EXTENSION_ROOT}`)) {
 		const container = document.querySelector('.pr-review-tools');
 		const anchor = document.createElement('div');
 		anchor.style.cssFloat = 'left';
-		anchor.id = 'extension-root';
+		anchor.id = EXTENSION_ROOT;
 		container.insertBefore(anchor, container.childNodes[0]);
 		ReactDOM.render(<App/>, anchor);
 		rendered = true;
+		console.log('--- rendered: ', rendered);
 	}
+	applyDiffRules()
+};
 
+const applyDiffRules = () => {
+	console.log('--- applyDiffRules');
 	StorageSync.get('rules').then(({ rules }) => {
 
 		[...document.querySelectorAll('.file')]
@@ -72,23 +82,51 @@ const powerDiff = () => {
 const { document, MutationObserver } = window;
 
 let observer;
+let fileObserver;
+
+const mainObserver = mutations => {
+	// console.log('mutations: ', mutations);
+	const $els = mutations.map(mutationRecord => mutationRecord.target);
+
+	const $diffProgressiveContainers = $els
+		.filter(el => el.className === 'js-diff-progressive-container');
+	const $distinctDiffProgressiveContainers = [...new Set($diffProgressiveContainers)];
+
+	const $diffLoadContainers = mutations
+		.filter(el => el.className === 'js-diff-load-container');
+	const $distinctDiffLoadContainer = [...new Set($diffLoadContainers)];
+
+	if ($distinctDiffProgressiveContainers.length || $distinctDiffLoadContainer.length) {
+		console.log('--- reapplying diff rule');
+		applyDiffRules();
+	}
+};
+
 const observe = () => {
+	console.log('--- in observe');
 	observer && observer.disconnect();
-	// const pjaxContainer = document.querySelector('[data-pjax-container]');
-	const pjaxContainer = document.querySelector('body');
-	observer = new MutationObserver(start);
-	observer.observe(pjaxContainer, { childList: true });
+	const $pjaxContainer = document.querySelector('[data-pjax-container]');
+	if ($pjaxContainer) {
+		observer = new MutationObserver(powerDiff);
+		observer.observe($pjaxContainer, { childList: true });
+	}
+
+	//
+	// This part is relevant only in pages with a diff (#files container)
+	//
+	const $files = document.querySelector('#files');
+	if ($files) {
+		fileObserver && fileObserver.disconnect();
+		fileObserver = new MutationObserver(mainObserver);
+		fileObserver.observe($files, {childList: true, subtree: true})
+	}
 };
 
 
-const start = () => {
-	observe();
+//
+// Kickstart PowerDiff only if we're in a page that contains diffs
+// This didn't work properly when trying from the manifest.json file
+//
+if (window.location.pathname.match(".+pull.+(files|commits\/)")) {
 	powerDiff();
-};
-
-// observe();
-
-// Didn't work properly without a setTimeout for some reason
-setTimeout(start, 1000);
-
-
+}

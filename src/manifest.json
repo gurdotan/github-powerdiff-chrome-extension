@@ -17,8 +17,12 @@
     "128": "icon-128.png"
   },
   "content_scripts": [{
-    "matches": ["http://*/*", "https://*/*", "<all_urls>"],
-    "css": ["content.styles.css"]
+    "matches": [
+			"*://*.github.com/*/pull/*/files*",
+			"*://*.github.com/*/pull/*/commits*"
+		],
+		"run_at": "document_idle",
+		"css": ["content.styles.css"]
   }],
   "web_accessible_resources": [
     "content.styles.css",

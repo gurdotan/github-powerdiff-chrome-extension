@@ -6,8 +6,8 @@ import { ThemeProvider } from 'styled-components';
 import StorageSync from '../../common/storage-sync';
 
 const EXTENSION_ROOT = 'github-powerdiff-extension-root';
-const CODE_ADDITION = '.blob-code-addition';
-const CODE_DELETION = '.blob-code-deletion';
+const CODE_ADDITION = 'blob-code-addition';
+const CODE_DELETION = 'blob-code-deletion';
 
 const App = () => (
 	<AppTheme theme={lightTheme} provider={ThemeProvider}>
@@ -19,8 +19,33 @@ const App = () => (
 
 
 function findCodeChangeNodes(file) {
-	return [...file.querySelectorAll(`${CODE_ADDITION}, ${CODE_DELETION}`)]
+	return [...file.querySelectorAll(`.${CODE_ADDITION}, .${CODE_DELETION}`)]
 		.filter(el => el);  // Filters (null, undefined, 0, -0, NaN, "", false, document.all)
+}
+
+function getLineNumber(el) {
+	const type = document.querySelector('meta[name="diff-view"]').content;
+	let lineNumberEl;
+
+	switch (type) {
+		case 'unified':
+
+			//
+			// In unified diff view, the HTML elements holding the line numbers
+			// are different for code additions and code deletions
+			//
+			lineNumberEl = el.classList.contains(CODE_ADDITION) ?
+				el.previousElementSibling :
+				el.previousElementSibling.previousElementSibling;
+			break;
+		case 'split':
+			lineNumberEl = el.previousElementSibling;
+			break;
+		default:
+			throw new Error("Can't recognize diff type - unified or split.");
+	}
+
+	return Number(lineNumberEl.dataset.lineNumber);
 }
 
 //
@@ -30,15 +55,48 @@ function parseToFileList(file) {
 
 	const changes = findCodeChangeNodes(file).map(el => ({
 		type      : el.classList.contains(CODE_ADDITION) ? 'addition' : 'deletion',
-		lineNumber: Number(el.previousElementSibling.dataset.lineNumber),
+		lineNumber: getLineNumber(el),
 		text      : el.innerText.trim(),
 		el,
+		row: el.parentNode
 	}));
+
+	const type = document.querySelector('meta[name="diff-view"]').content;
+	let groupedChanges = [];
+
+	//
+	// Figure out change groups in 'unified' diff view
+	//
+	if (type === 'unified') {
+
+		let i = 0;
+		let tmpArray = [];
+
+		while (i < changes.length) {
+			if (i === 0 || (changes[i].el.parentElement.previousElementSibling === changes[i - 1].el.parentElement)) {
+				tmpArray.push(changes[i]);
+			} else {
+				groupedChanges.push(tmpArray);
+				tmpArray = [];
+				tmpArray.push(changes[i]);
+			}
+			i++;
+		}
+
+		groupedChanges = groupedChanges.map(group => {
+			return group.reduce((obj, change) => {
+				obj[change.type] || (obj[change.type] = []);
+				obj[change.type].push(change);
+				return obj;
+			}, {});
+		})
+	}
 
 	return {
 		el : file,
 		ext: file.dataset.fileType.slice(1),
 		changes,
+		groupedChanges
 	};
 }
 
@@ -63,19 +121,33 @@ const powerDiff = () => {
 	applyDiffRules()
 };
 
-const applyDiffRules = () => {
-	console.log('--- applyDiffRules');
-	StorageSync.get('rules').then(({ rules }) => {
+const executeDiffRules = (rules, type = 'apply') => {
+	[...document.querySelectorAll('.file')]
+		.map(parseToFileList)
+		.filter(onlyFilesWithChanges)
+		.filter(file => !!(rules.map(rule => rule.ext).flat()).includes(file.ext))
+		.forEach(file => {
+			rules.filter(rule => rule.ext.includes(file.ext))
+				.forEach(rule => {
+					eval(`(${rule[type]})`)(file)
+				});
+		});
+};
 
-		[...document.querySelectorAll('.file')]
-			.map(parseToFileList)
-			.filter(onlyFilesWithChanges)
-			.filter(file => !!rules[file.ext])
-			.forEach(file => {
-				rules[file.ext].forEach(rule => eval(`(${rule.callback})`)(file));
-			});
-	});
+export const applyDiffRules = (rules) => {
+	console.log('--- applyDiffRules: ', rules);
+	if (!rules) return;
+	// StorageSync.get('rules').then(({ rules }) => {
 
+	executeDiffRules(rules, 'apply');
+};
+
+export const clearDiffRules = (rules) => {
+	console.log('--- clearDiffRules: ', rules);
+	if (!rules) return;
+	// StorageSync.get('rules').then(({ rules }) => {
+
+	executeDiffRules(rules, 'clear');
 };
 
 
